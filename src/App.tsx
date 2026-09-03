@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import GameLibrariesPage from "./components/GameLibrariesPage";
+import LibraryPage from "./components/LibraryPage";
 import "./App.css";
 
 type SteamGame = {
@@ -219,6 +220,12 @@ function App() {
 
         {activeNav === "Settings" ? (
           <GameLibrariesPage />
+        ) : activeNav === "Library" ? (
+          <LibraryPage
+            games={steamScan?.games ?? []}
+            loading={!steamScan && !steamError}
+            error={steamError}
+          />
         ) : (
           <>
             <section className="hero">

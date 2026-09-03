@@ -1397,3 +1397,352 @@ input:focus-visible {
     text-align: left;
   }
 }
+/* PandaForge real library */
+.library-page {
+  width: min(1120px, 100%);
+  padding: 34px 0 50px;
+  margin: 0 auto;
+}
+
+.library-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.library-page-heading h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(32px, 4vw, 46px);
+  font-weight: 1000;
+  letter-spacing: -0.045em;
+}
+
+.library-page-heading > div:first-child > p:last-child {
+  max-width: 640px;
+  margin: 12px 0 0;
+  color: #808b95;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.library-count-card {
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 255, 0, 0.12);
+  border-radius: 11px;
+  background: rgba(239, 255, 0, 0.035);
+}
+
+.library-count-card strong {
+  color: var(--forge-yellow);
+  font-size: 27px;
+}
+
+.library-count-card span {
+  margin-top: 2px;
+  color: #737d86;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.library-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.library-summary-grid article {
+  display: flex;
+  min-height: 70px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 11px;
+  background: var(--graphite);
+}
+
+.library-summary-grid span {
+  color: #68737c;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.library-summary-grid strong {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.library-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.library-search {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  background: #11151a;
+}
+
+.library-search span {
+  color: #69737c;
+}
+
+.library-search input {
+  width: 100%;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  font-size: 10px;
+}
+
+.library-search input::placeholder {
+  color: #59636c;
+}
+
+.library-sort {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 9px;
+  background: #11151a;
+}
+
+.library-sort > span {
+  color: #626d76;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.library-sort select {
+  height: 42px;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: #11151a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.real-game-list {
+  display: grid;
+  gap: 11px;
+  margin-top: 14px;
+}
+
+.real-game-card {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 17px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background:
+    linear-gradient(120deg, rgba(239, 255, 0, 0.025), transparent 30%),
+    var(--graphite);
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.real-game-card:hover {
+  border-color: rgba(239, 255, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.real-game-mark {
+  display: grid;
+  width: 74px;
+  height: 74px;
+  place-items: center;
+  border: 1px solid rgba(239, 255, 0, 0.12);
+  border-radius: 12px;
+  color: var(--forge-yellow);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(239, 255, 0, 0.09), transparent 50%),
+    #101409;
+  font-size: 19px;
+  font-weight: 1000;
+  letter-spacing: -0.06em;
+}
+
+.real-game-main {
+  min-width: 0;
+}
+
+.real-game-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.real-game-platform {
+  color: #78838c;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.real-game-title-row h3 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 17px;
+}
+
+.real-game-appid {
+  padding: 5px 7px;
+  border-radius: 5px;
+  color: #6f7982;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.real-game-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.real-game-meta-grid div {
+  min-width: 0;
+}
+
+.real-game-meta-grid span,
+.real-game-path > span {
+  display: block;
+  color: #5f6972;
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.real-game-meta-grid strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #b7c0c8;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.real-game-path {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.real-game-path code {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #76818a;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-state-card {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px;
+  margin-top: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #737d86;
+  text-align: center;
+}
+
+.library-state-card strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.library-state-card span {
+  font-size: 9px;
+}
+
+.library-state-error {
+  border-color: rgba(255, 71, 87, 0.18);
+}
+
+.library-state-error strong {
+  color: var(--danger);
+}
+
+@media (max-width: 900px) {
+  .real-game-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .library-page-heading,
+  .library-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .library-count-card {
+    align-items: flex-start;
+  }
+
+  .library-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .real-game-card {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .real-game-mark {
+    width: 54px;
+    height: 54px;
+  }
+
+  .real-game-title-row {
+    flex-direction: column;
+  }
+
+  .real-game-meta-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
