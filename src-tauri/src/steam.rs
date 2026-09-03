@@ -270,7 +270,9 @@ pub fn scan_steam_games() -> Result<SteamScanResult, String> {
             }
 
             if let Ok(game) = parse_manifest(&path, library_path) {
-                games.push(game);
+                if is_user_visible_game(&game) {
+                    games.push(game);
+                }
             }
         }
     }
@@ -287,6 +289,171 @@ pub fn scan_steam_games() -> Result<SteamScanResult, String> {
     })
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovedLibraryScanResult {
+    pub approved_paths: Vec<String>,
+    pub steam_library_paths: Vec<String>,
+    pub games: Vec<SteamGame>,
+    pub warnings: Vec<String>,
+}
+
+fn path_identity(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase()
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, seen: &mut HashSet<String>, path: PathBuf) {
+    let identity = path_identity(&path);
+
+    if seen.insert(identity) {
+        paths.push(path);
+    }
+}
+
+fn discover_steam_roots(approved_path: &Path) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    let mut seen = HashSet::new();
+
+    if approved_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("steamapps"))
+    {
+        if let Some(parent) = approved_path.parent() {
+            push_unique_path(&mut roots, &mut seen, parent.to_path_buf());
+        }
+    }
+
+    if approved_path.join("steamapps").is_dir() {
+        push_unique_path(&mut roots, &mut seen, approved_path.to_path_buf());
+    }
+
+    for common_name in ["SteamLibrary", "Steam"] {
+        let candidate = approved_path.join(common_name);
+
+        if candidate.join("steamapps").is_dir() {
+            push_unique_path(&mut roots, &mut seen, candidate);
+        }
+    }
+
+    if let Ok(entries) = fs::read_dir(approved_path) {
+        for entry in entries.flatten() {
+            let candidate = entry.path();
+
+            if candidate.is_dir() && candidate.join("steamapps").is_dir() {
+                push_unique_path(&mut roots, &mut seen, candidate);
+            }
+        }
+    }
+
+    roots
+}
+
+fn is_user_visible_game(game: &SteamGame) -> bool {
+    !matches!(
+        game.app_id.as_str(),
+        "228980" // Steamworks Common Redistributables
+    )
+}
+
+fn scan_library_manifests(library_path: &Path) -> Result<Vec<SteamGame>, String> {
+    let steamapps = library_path.join("steamapps");
+
+    if !steamapps.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let entries = fs::read_dir(&steamapps).map_err(|error| {
+        format!(
+            "Unable to read Steam library '{}': {error}",
+            steamapps.display()
+        )
+    })?;
+
+    let mut games = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if !path.is_file() {
+            continue;
+        }
+
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+
+        if !file_name.starts_with("appmanifest_") || !file_name.ends_with(".acf") {
+            continue;
+        }
+
+        if let Ok(game) = parse_manifest(&path, library_path) {
+            games.push(game);
+        }
+    }
+
+    Ok(games)
+}
+
+#[tauri::command]
+pub fn scan_approved_libraries(paths: Vec<String>) -> Result<ApprovedLibraryScanResult, String> {
+    let mut approved_paths = Vec::new();
+    let mut steam_library_paths = Vec::new();
+    let mut steam_library_seen = HashSet::new();
+    let mut warnings = Vec::new();
+
+    for value in paths {
+        let approved = normalize_steam_path(&value);
+        approved_paths.push(approved.to_string_lossy().to_string());
+
+        if !approved.exists() {
+            warnings.push(format!(
+                "Approved location is currently unavailable: {}",
+                approved.display()
+            ));
+            continue;
+        }
+
+        for root in discover_steam_roots(&approved) {
+            let identity = path_identity(&root);
+
+            if steam_library_seen.insert(identity) {
+                steam_library_paths.push(root);
+            }
+        }
+    }
+
+    let mut games = Vec::new();
+    let mut game_ids = HashSet::new();
+
+    for library_path in &steam_library_paths {
+        match scan_library_manifests(library_path) {
+            Ok(found_games) => {
+                for game in found_games {
+                    if is_user_visible_game(&game) && game_ids.insert(game.app_id.clone()) {
+                        games.push(game);
+                    }
+                }
+            }
+            Err(error) => warnings.push(error),
+        }
+    }
+
+    games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    Ok(ApprovedLibraryScanResult {
+        approved_paths,
+        steam_library_paths: steam_library_paths
+            .iter()
+            .map(|path| path.to_string_lossy().to_string())
+            .collect(),
+        games,
+        warnings,
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,6 +481,24 @@ mod tests {
                 r"C:\Program Files (x86)\Steam\steam.exe".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn hides_steamworks_common_redistributables() {
+        let game = SteamGame {
+            app_id: "228980".to_string(),
+            name: "Steamworks Common Redistributables".to_string(),
+            install_dir: "Steamworks Shared".to_string(),
+            install_path: String::new(),
+            library_path: String::new(),
+            size_on_disk: 0,
+            build_id: String::new(),
+            state_flags: 0,
+            last_updated: 0,
+            last_played: 0,
+        };
+
+        assert!(!is_user_visible_game(&game));
     }
 
     #[test]

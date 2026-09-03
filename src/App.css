@@ -1299,3 +1299,101 @@ input:focus-visible {
     width: 100%;
   }
 }
+/* PandaForge approved-library scan results */
+.scan-results {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: var(--graphite);
+}
+
+.scan-results-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.scan-results-heading .eyebrow {
+  margin: 0;
+}
+
+.scan-results-heading strong {
+  color: var(--forge-yellow);
+  font-size: 18px;
+}
+
+.scan-results-list {
+  display: grid;
+}
+
+.scan-result-game {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(0, 1.25fr);
+  gap: 20px;
+  align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.scan-result-game:last-child {
+  border-bottom: 0;
+}
+
+.scan-result-game strong {
+  display: block;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.scan-result-game div > span {
+  display: block;
+  margin-top: 4px;
+  color: #626d76;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.scan-result-path {
+  overflow: hidden;
+  color: #7a858f;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-warnings {
+  display: grid;
+  gap: 5px;
+  padding: 13px 15px;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 176, 32, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 176, 32, 0.045);
+}
+
+.scan-warnings strong {
+  color: var(--warning);
+  font-size: 10px;
+}
+
+.scan-warnings span {
+  color: #897b61;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 780px) {
+  .scan-result-game {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .scan-result-path {
+    text-align: left;
+  }
+}

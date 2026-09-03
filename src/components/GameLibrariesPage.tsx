@@ -1,10 +1,25 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { load } from "@tauri-apps/plugin-store";
 
 type LibraryLocation = {
   path: string;
   addedAt: number;
+};
+
+type ScannedSteamGame = {
+  appId: string;
+  name: string;
+  installPath: string;
+  libraryPath: string;
+};
+
+type ApprovedLibraryScanResult = {
+  approvedPaths: string[];
+  steamLibraryPaths: string[];
+  games: ScannedSteamGame[];
+  warnings: string[];
 };
 
 const STORE_FILE = "pandaforge-settings.json";
@@ -28,6 +43,10 @@ export default function GameLibrariesPage() {
   const [libraries, setLibraries] = useState<LibraryLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] =
+    useState<ApprovedLibraryScanResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,8 +147,36 @@ export default function GameLibrariesPage() {
       await persistLibraries(
         libraries.filter((library) => pathIdentity(library.path) !== identity),
       );
+
+      setScanResult(null);
+      setScanError(null);
     } catch (error) {
       setStorageError(String(error));
+    }
+  }
+
+  async function scanLibraries() {
+    if (libraries.length === 0 || scanning) {
+      return;
+    }
+
+    setScanning(true);
+    setScanError(null);
+
+    try {
+      const result = await invoke<ApprovedLibraryScanResult>(
+        "scan_approved_libraries",
+        {
+          paths: libraries.map((library) => library.path),
+        },
+      );
+
+      setScanResult(result);
+    } catch (error) {
+      setScanResult(null);
+      setScanError(String(error));
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -240,24 +287,72 @@ export default function GameLibrariesPage() {
 
       <div className="scan-panel">
         <div>
-          <p className="eyebrow">NEXT STEP</p>
-          <h3>Scan approved libraries</h3>
+          <p className="eyebrow">GAME DISCOVERY</p>
+          <h3>
+            {scanResult
+              ? `${scanResult.games.length} installed entries found`
+              : "Scan approved libraries"}
+          </h3>
           <p>
-            Once your locations are correct, PandaForge will inspect them for
-            supported game libraries and installed titles.
+            {scanResult
+              ? `${scanResult.steamLibraryPaths.length} Steam ${
+                  scanResult.steamLibraryPaths.length === 1
+                    ? "library"
+                    : "libraries"
+                } detected across your approved locations.`
+              : "PandaForge will inspect only the locations you approved for supported game libraries and installed titles."}
           </p>
         </div>
 
         <button
           type="button"
           className="scan-library-button"
-          disabled={libraries.length === 0}
-          title="Scanner connection is the next build step"
+          disabled={libraries.length === 0 || scanning}
+          onClick={scanLibraries}
         >
           <span>↻</span>
-          Scan Libraries
+          {scanning ? "Scanning..." : "Scan Libraries"}
         </button>
       </div>
+
+      {scanError && (
+        <div className="library-error">
+          <strong>Library scan failed</strong>
+          <span>{scanError}</span>
+        </div>
+      )}
+
+      {scanResult && scanResult.games.length > 0 && (
+        <div className="scan-results">
+          <div className="scan-results-heading">
+            <p className="eyebrow">DETECTED STEAM ENTRIES</p>
+            <strong>{scanResult.games.length}</strong>
+          </div>
+
+          <div className="scan-results-list">
+            {scanResult.games.map((game) => (
+              <div className="scan-result-game" key={game.appId}>
+                <div>
+                  <strong>{game.name}</strong>
+                  <span>Steam App {game.appId}</span>
+                </div>
+                <span className="scan-result-path" title={game.installPath}>
+                  {game.installPath}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {scanResult && scanResult.warnings.length > 0 && (
+        <div className="scan-warnings">
+          <strong>Scan warnings</strong>
+          {scanResult.warnings.map((warning) => (
+            <span key={warning}>{warning}</span>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
