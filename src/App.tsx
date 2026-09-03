@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import GameLibrariesPage from "./components/GameLibrariesPage";
 import "./App.css";
 
 type SteamGame = {
@@ -172,7 +173,13 @@ function App() {
           </p>
         </div>
 
-        <button className="settings-button" type="button">
+        <button
+          className={`settings-button ${
+            activeNav === "Settings" ? "settings-button-active" : ""
+          }`}
+          type="button"
+          onClick={() => setActiveNav("Settings")}
+        >
           <span>⚙</span>
           <span>Settings</span>
         </button>
@@ -210,7 +217,11 @@ function App() {
           </div>
         </header>
 
-        <section className="hero">
+        {activeNav === "Settings" ? (
+          <GameLibrariesPage />
+        ) : (
+          <>
+            <section className="hero">
           <div className="hero-copy">
             <p className="eyebrow">YOUR GAMING CONTROL CENTRE</p>
             <h2>
@@ -320,6 +331,8 @@ function App() {
             </article>
           ))}
         </section>
+          </>
+        )}
       </main>
     </div>
   );
