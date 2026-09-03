@@ -1,5 +1,25 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+
+type SteamGame = {
+  appId: string;
+  name: string;
+  installDir: string;
+  installPath: string;
+  libraryPath: string;
+  sizeOnDisk: number;
+  buildId: string;
+  stateFlags: number;
+  lastUpdated: number;
+  lastPlayed: number;
+};
+
+type SteamScanResult = {
+  steamPath: string;
+  libraryPaths: string[];
+  games: SteamGame[];
+};
 
 type NavItem = {
   label: string;
@@ -74,6 +94,30 @@ function PandaMark() {
 
 function App() {
   const [activeNav, setActiveNav] = useState("Home");
+  const [steamScan, setSteamScan] = useState<SteamScanResult | null>(null);
+  const [steamError, setSteamError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    invoke<SteamScanResult>("scan_steam_games")
+      .then((result) => {
+        if (!cancelled) {
+          setSteamScan(result);
+          setSteamError(null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSteamScan(null);
+          setSteamError(String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="app-shell">
@@ -111,9 +155,21 @@ function App() {
         <div className="system-card">
           <div className="system-card-header">
             <span className="status-dot status-ready" />
-            <span>System ready</span>
+            <span>
+              {steamError
+                ? "Steam scan failed"
+                : steamScan
+                  ? "Steam connected"
+                  : "Scanning Steam"}
+            </span>
           </div>
-          <p>Game monitoring is ready to be connected.</p>
+          <p>
+            {steamError
+              ? steamError
+              : steamScan
+                ? `${steamScan.games.length} installed Steam games found across ${steamScan.libraryPaths.length} library.`
+                : "Reading your local Steam installation..."}
+          </p>
         </div>
 
         <button className="settings-button" type="button">
@@ -173,8 +229,8 @@ function App() {
               <PandaMark />
             </div>
             <div>
-              <strong>27</strong>
-              <span>games detected</span>
+              <strong>{steamScan ? steamScan.games.length : "—"}</strong>
+              <span>{steamError ? "scan unavailable" : "games detected"}</span>
             </div>
           </div>
         </section>
