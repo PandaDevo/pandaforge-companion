@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PandaForge Companion",
+  "productName": "PandaVault",
   "version": "0.1.0",
   "identifier": "com.pandaforge.companion",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "PandaForge Companion",
+        "title": "PandaVault",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

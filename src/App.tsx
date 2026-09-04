@@ -23,21 +23,28 @@ type SteamScanResult = {
   games: SteamGame[];
 };
 
-type NavItem = {
-  label: string;
-  icon: string;
+type GameAnalytics = {
+  appId: string;
+  gameName: string;
+  totalSeconds: number;
+  sessionCount: number;
 };
 
-type GameStatus = "ready" | "update" | "risk";
+type RecentSession = {
+  id: number;
+  appId: string;
+  gameName: string;
+  startedAt: number;
+  endedAt: number;
+  durationSeconds: number;
+};
 
-type Game = {
-  title: string;
-  subtitle: string;
-  status: GameStatus;
-  statusLabel: string;
-  meta: string;
-  action: string;
-  accent: string;
+type AnalyticsSummary = {
+  totalSeconds: number;
+  sessionCount: number;
+  uniqueGames: number;
+  topGames: GameAnalytics[];
+  recentSessions: RecentSession[];
 };
 
 const navItems: NavItem[] = [
@@ -49,39 +56,47 @@ const navItems: NavItem[] = [
   { label: "Deals", icon: "£" },
 ];
 
-const games: Game[] = [
-  {
-    title: "Cyberpunk 2077",
-    subtitle: "Steam",
-    status: "ready",
-    statusLabel: "Ready to play",
-    meta: "New update since you last played",
-    action: "What changed?",
-    accent: "cyberpunk",
-  },
-  {
-    title: "7 Days to Die",
-    subtitle: "Steam",
-    status: "risk",
-    statusLabel: "Mod risk detected",
-    meta: "31 mods installed · 6 potentially affected",
-    action: "Check mod health",
-    accent: "seven-days",
-  },
-  {
-    title: "Hell Let Loose",
-    subtitle: "Steam",
-    status: "update",
-    statusLabel: "Update available",
-    meta: "Last played 3 days ago",
-    action: "View update",
-    accent: "hell-let-loose",
-  },
-];
+type NavItem = {
+  label: string;
+  icon: string;
+};
+
+function formatDuration(totalSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+
+  if (safeSeconds < 60) {
+    return `${safeSeconds}s`;
+  }
+
+  const totalMinutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  if (totalMinutes < 60) {
+    return seconds > 0 ? `${totalMinutes}m ${seconds}s` : `${totalMinutes}m`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+function formatSessionDate(unixSeconds: number) {
+  if (!unixSeconds) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(unixSeconds * 1000));
+}
 
 function PandaMark() {
   return (
-    <div className="panda-mark" aria-label="PandaForge">
+    <div className="panda-mark" aria-label="PandaVault">
       <span className="panda-ear panda-ear-left" />
       <span className="panda-ear panda-ear-right" />
       <span className="panda-face">
@@ -98,6 +113,8 @@ function App() {
   const [activeNav, setActiveNav] = useState("Home");
   const [steamScan, setSteamScan] = useState<SteamScanResult | null>(null);
   const [steamError, setSteamError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +138,35 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAnalytics = () => {
+      invoke<AnalyticsSummary>("get_analytics_summary")
+        .then((result) => {
+          if (!cancelled) {
+            setAnalytics(result);
+            setAnalyticsError(null);
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setAnalytics(null);
+            setAnalyticsError(String(error));
+          }
+        });
+    };
+
+    loadAnalytics();
+
+    const interval = window.setInterval(loadAnalytics, 10_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -130,9 +176,9 @@ function App() {
           <div className="brand-copy">
             <div className="brand-name">
               <span>PANDA</span>
-              <strong>FORGE</strong>
+              <strong>VAULT</strong>
             </div>
-            <div className="brand-product">COMPANION</div>
+            <div className="brand-product">BY PANDAFORGE SOFTWARE</div>
           </div>
         </div>
 
@@ -194,7 +240,7 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div>
-            <p className="eyebrow">PANDAFORGE COMPANION</p>
+            <p className="eyebrow">PANDAVAULT</p>
             <h1>{activeNav}</h1>
           </div>
 
@@ -253,91 +299,134 @@ function App() {
           </div>
         </section>
 
-        <section className="health-grid" aria-label="Game health summary">
+        <section className="health-grid" aria-label="Gaming summary">
           <article className="health-card">
-            <span className="health-icon ready">✓</span>
+            <span className="health-icon ready">▦</span>
             <div>
-              <strong>22</strong>
-              <span>Ready to play</span>
+              <strong>{steamScan?.games.length ?? "—"}</strong>
+              <span>Installed games</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon update">↻</span>
+            <span className="health-icon update">◷</span>
             <div>
-              <strong>3</strong>
-              <span>Updates available</span>
+              <strong>
+                {analytics ? formatDuration(analytics.totalSeconds) : "—"}
+              </strong>
+              <span>Tracked playtime</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon risk">!</span>
+            <span className="health-icon risk">▶</span>
             <div>
-              <strong>2</strong>
-              <span>Need attention</span>
+              <strong>{analytics?.sessionCount ?? "—"}</strong>
+              <span>Play sessions</span>
             </div>
           </article>
 
           <article className="health-card health-card-forge">
-            <span className="health-icon forge">⚡</span>
+            <span className="health-icon forge">◆</span>
             <div>
-              <strong>4</strong>
-              <span>Changes since played</span>
+              <strong>{analytics?.uniqueGames ?? "—"}</strong>
+              <span>Games tracked</span>
             </div>
           </article>
         </section>
 
         <section className="section-heading">
           <div>
-            <p className="eyebrow">YOUR GAMES</p>
-            <h3>Needs your attention</h3>
+            <p className="eyebrow">YOUR GAMING</p>
+            <h3>Gaming activity</h3>
           </div>
 
-          <button type="button" className="text-button">
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setActiveNav("Library")}
+          >
             View library
             <span>→</span>
           </button>
         </section>
 
-        <section className="game-grid">
-          {games.map((game) => (
-            <article key={game.title} className={`game-card ${game.accent}`}>
-              <div className="game-art">
-                <div className="game-art-shade" />
-
-                <div className="game-card-top">
-                  <span className={`game-status game-status-${game.status}`}>
-                    <span className="status-dot" />
-                    {game.statusLabel}
-                  </span>
-
-                  <button type="button" className="more-button" aria-label="More options">
-                    •••
-                  </button>
+        {analyticsError ? (
+          <section className="analytics-empty">
+            <strong>Analytics unavailable</strong>
+            <p>{analyticsError}</p>
+          </section>
+        ) : !analytics ? (
+          <section className="analytics-empty">
+            <strong>Loading gaming activity...</strong>
+            <p>Reading your local PandaVault play history.</p>
+          </section>
+        ) : analytics.sessionCount === 0 ? (
+          <section className="analytics-empty">
+            <strong>No tracked sessions yet</strong>
+            <p>
+              Launch a Steam game while PandaVault is running and your gaming
+              history will appear here automatically.
+            </p>
+          </section>
+        ) : (
+          <section className="analytics-layout" aria-label="Gaming activity">
+            <article className="analytics-panel">
+              <div className="analytics-panel-heading">
+                <div>
+                  <p className="eyebrow">TOP GAMES</p>
+                  <h4>Most played</h4>
                 </div>
-
-                <div className="game-title">
-                  <span>{game.subtitle}</span>
-                  <h4>{game.title}</h4>
-                </div>
+                <span>{formatDuration(analytics.totalSeconds)} total</span>
               </div>
 
-              <div className="game-details">
-                <p>{game.meta}</p>
+              <div className="analytics-game-list">
+                {analytics.topGames.map((game, index) => (
+                  <div className="analytics-game-row" key={game.appId}>
+                    <span className="analytics-rank">{index + 1}</span>
 
-                <div className="game-actions">
-                  <button type="button" className="secondary-button">
-                    {game.action}
-                  </button>
-                  <button type="button" className="play-button">
-                    Play
-                    <span>▶</span>
-                  </button>
-                </div>
+                    <div className="analytics-game-copy">
+                      <strong>{game.gameName}</strong>
+                      <span>
+                        {game.sessionCount}{" "}
+                        {game.sessionCount === 1 ? "session" : "sessions"}
+                      </span>
+                    </div>
+
+                    <strong className="analytics-duration">
+                      {formatDuration(game.totalSeconds)}
+                    </strong>
+                  </div>
+                ))}
               </div>
             </article>
-          ))}
-        </section>
+
+            <article className="analytics-panel">
+              <div className="analytics-panel-heading">
+                <div>
+                  <p className="eyebrow">RECENT</p>
+                  <h4>Play sessions</h4>
+                </div>
+                <span>{analytics.sessionCount} recorded</span>
+              </div>
+
+              <div className="analytics-session-list">
+                {analytics.recentSessions.slice(0, 5).map((session) => (
+                  <div className="analytics-session-row" key={session.id}>
+                    <div className="analytics-game-copy">
+                      <strong>{session.gameName}</strong>
+                      <span>{formatSessionDate(session.endedAt)}</span>
+                    </div>
+
+                    <strong className="analytics-duration">
+                      {formatDuration(session.durationSeconds)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+        )}
           </>
         )}
       </main>

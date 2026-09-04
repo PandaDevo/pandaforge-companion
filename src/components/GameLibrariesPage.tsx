@@ -186,7 +186,7 @@ export default function GameLibrariesPage() {
         <p className="eyebrow">LOCAL GAME DISCOVERY</p>
         <h2>Game Libraries</h2>
         <p>
-          Choose the folders PandaForge Companion is allowed to inspect for
+          Choose the folders PandaVault is allowed to inspect for
           installed games. Add as many drives or game-library locations as you
           need.
         </p>
@@ -197,7 +197,7 @@ export default function GameLibrariesPage() {
         <div>
           <strong>You stay in control.</strong>
           <p>
-            These locations are stored locally on this computer. PandaForge
+            These locations are stored locally on this computer. PandaVault
             only scans folders you approve.
           </p>
         </div>
@@ -300,7 +300,7 @@ export default function GameLibrariesPage() {
                     ? "library"
                     : "libraries"
                 } detected across your approved locations.`
-              : "PandaForge will inspect only the locations you approved for supported game libraries and installed titles."}
+              : "PandaVault will inspect only the locations you approved for supported game libraries and installed titles."}
           </p>
         </div>
 

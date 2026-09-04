@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export type LibrarySteamGame = {
   appId: string;
@@ -11,6 +12,13 @@ export type LibrarySteamGame = {
   stateFlags: number;
   lastUpdated: number;
   lastPlayed: number;
+};
+
+type RunningGame = {
+  appId: string;
+  name: string;
+  installPath: string;
+  executablePath: string;
 };
 
 type LibraryPageProps = {
@@ -82,6 +90,48 @@ export default function LibraryPage({
 }: LibraryPageProps) {
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [runningGames, setRunningGames] = useState<RunningGame[]>([]);
+  const [runningError, setRunningError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshRunningGames() {
+      if (games.length === 0) {
+        if (!cancelled) {
+          setRunningGames([]);
+          setRunningError(null);
+        }
+
+        return;
+      }
+
+      try {
+        const result = await invoke<RunningGame[]>("detect_running_games", {
+          games,
+        });
+
+        if (!cancelled) {
+          setRunningGames(result);
+          setRunningError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRunningGames([]);
+          setRunningError(String(error));
+        }
+      }
+    }
+
+    refreshRunningGames();
+
+    const interval = window.setInterval(refreshRunningGames, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [games]);
 
   const visibleGames = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -119,6 +169,11 @@ export default function LibraryPage({
     [games],
   );
 
+  const runningAppIds = useMemo(
+    () => new Set(runningGames.map((game) => game.appId)),
+    [runningGames],
+  );
+
   return (
     <section className="library-page">
       <div className="library-page-heading">
@@ -149,8 +204,8 @@ export default function LibraryPage({
         </article>
 
         <article>
-          <span>Platform</span>
-          <strong>Steam</strong>
+          <span>Running now</span>
+          <strong>{runningGames.length}</strong>
         </article>
       </div>
 
@@ -195,6 +250,13 @@ export default function LibraryPage({
         </div>
       )}
 
+      {runningError && !error && (
+        <div className="library-runtime-warning">
+          <strong>Live game detection unavailable</strong>
+          <span>{runningError}</span>
+        </div>
+      )}
+
       {!loading && !error && visibleGames.length === 0 && (
         <div className="library-state-card">
           <strong>
@@ -225,9 +287,18 @@ export default function LibraryPage({
                     <h3>{game.name}</h3>
                   </div>
 
-                  <span className="real-game-appid">
-                    APP {game.appId}
-                  </span>
+                  <div className="real-game-status-area">
+                    {runningAppIds.has(game.appId) && (
+                      <span className="real-game-running">
+                        <span className="status-dot status-ready" />
+                        RUNNING
+                      </span>
+                    )}
+
+                    <span className="real-game-appid">
+                      APP {game.appId}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="real-game-meta-grid">
