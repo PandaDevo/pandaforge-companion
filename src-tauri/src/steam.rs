@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -19,6 +19,8 @@ pub struct SteamGame {
     pub state_flags: u64,
     pub last_updated: u64,
     pub last_played: u64,
+    pub steam_playtime_minutes: Option<u64>,
+    pub steam_playtime_2weeks_minutes: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,6 +77,175 @@ fn parse_quoted_pair(line: &str) -> Option<(String, String)> {
 fn normalize_steam_path(value: &str) -> PathBuf {
     let unescaped = value.replace("\\\\", "\\");
     PathBuf::from(unescaped.replace('/', "\\"))
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct SteamPlaytime {
+    lifetime_minutes: Option<u64>,
+    two_weeks_minutes: Option<u64>,
+}
+
+fn brace_delta(line: &str) -> i32 {
+    let mut delta = 0_i32;
+    let mut in_quotes = false;
+    let mut escaped = false;
+
+    for ch in line.chars() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+
+        if ch == '\\' && in_quotes {
+            escaped = true;
+            continue;
+        }
+
+        if ch == '"' {
+            in_quotes = !in_quotes;
+            continue;
+        }
+
+        if in_quotes {
+            continue;
+        }
+
+        match ch {
+            '{' => delta += 1,
+            '}' => delta -= 1,
+            _ => {}
+        }
+    }
+
+    delta
+}
+
+fn parse_localconfig_playtimes(contents: &str) -> HashMap<String, SteamPlaytime> {
+    let lines: Vec<&str> = contents.lines().collect();
+    let mut results = HashMap::new();
+
+    let mut index = 0_usize;
+
+    while index < lines.len() {
+        let trimmed = lines[index].trim();
+
+        let Some(app_id) = trimmed
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+            .filter(|value| !value.is_empty() && value.chars().all(|ch| ch.is_ascii_digit()))
+        else {
+            index += 1;
+            continue;
+        };
+
+        let mut cursor = index + 1;
+
+        while cursor < lines.len() && lines[cursor].trim().is_empty() {
+            cursor += 1;
+        }
+
+        if cursor >= lines.len() || lines[cursor].trim() != "{" {
+            index += 1;
+            continue;
+        }
+
+        let mut depth = 1_i32;
+        let mut playtime = SteamPlaytime::default();
+        cursor += 1;
+
+        while cursor < lines.len() && depth > 0 {
+            let line = lines[cursor];
+
+            if depth > 0 {
+                if let Some((key, value)) = parse_quoted_pair(line) {
+                    match key.as_str() {
+                        "Playtime" => playtime.lifetime_minutes = value.parse().ok(),
+                        "Playtime2wks" => playtime.two_weeks_minutes = value.parse().ok(),
+                        _ => {}
+                    }
+                }
+            }
+
+            depth += brace_delta(line);
+            cursor += 1;
+        }
+
+        if playtime.lifetime_minutes.is_some() || playtime.two_weeks_minutes.is_some() {
+            results
+                .entry(app_id.to_string())
+                .and_modify(|existing: &mut SteamPlaytime| {
+                    if playtime.lifetime_minutes.is_some() {
+                        existing.lifetime_minutes = playtime.lifetime_minutes;
+                    }
+
+                    if playtime.two_weeks_minutes.is_some() {
+                        existing.two_weeks_minutes = playtime.two_weeks_minutes;
+                    }
+                })
+                .or_insert(playtime);
+        }
+
+        index = cursor.max(index + 1);
+    }
+
+    results
+}
+
+fn read_local_steam_playtimes(steam_path: &Path) -> HashMap<String, SteamPlaytime> {
+    let userdata = steam_path.join("userdata");
+
+    if !userdata.is_dir() {
+        return HashMap::new();
+    }
+
+    let Ok(account_entries) = fs::read_dir(userdata) else {
+        return HashMap::new();
+    };
+
+    let mut playtimes = HashMap::new();
+
+    for entry in account_entries.flatten() {
+        let config_path = entry.path().join("config").join("localconfig.vdf");
+
+        if !config_path.is_file() {
+            continue;
+        }
+
+        let Ok(contents) = fs::read_to_string(config_path) else {
+            continue;
+        };
+
+        for (app_id, playtime) in parse_localconfig_playtimes(&contents) {
+            playtimes
+                .entry(app_id)
+                .and_modify(|existing: &mut SteamPlaytime| {
+                    if playtime.lifetime_minutes.is_some() {
+                        existing.lifetime_minutes = playtime.lifetime_minutes;
+                    }
+
+                    if playtime.two_weeks_minutes.is_some() {
+                        existing.two_weeks_minutes = playtime.two_weeks_minutes;
+                    }
+                })
+                .or_insert(playtime);
+        }
+    }
+
+    playtimes
+}
+
+fn apply_local_steam_playtimes(games: &mut [SteamGame]) {
+    let Ok(steam_path) = detect_steam_path() else {
+        return;
+    };
+
+    let playtimes = read_local_steam_playtimes(&steam_path);
+
+    for game in games {
+        if let Some(playtime) = playtimes.get(&game.app_id) {
+            game.steam_playtime_minutes = playtime.lifetime_minutes;
+            game.steam_playtime_2weeks_minutes = playtime.two_weeks_minutes;
+        }
+    }
 }
 
 fn steam_path_from_registry() -> Option<PathBuf> {
@@ -225,6 +396,8 @@ fn parse_manifest(path: &Path, library_path: &Path) -> Result<SteamGame, String>
         state_flags,
         last_updated,
         last_played,
+        steam_playtime_minutes: None,
+        steam_playtime_2weeks_minutes: None,
     })
 }
 
@@ -276,6 +449,8 @@ pub fn scan_steam_games() -> Result<SteamScanResult, String> {
             }
         }
     }
+
+    apply_local_steam_playtimes(&mut games);
 
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
@@ -442,6 +617,8 @@ pub fn scan_approved_libraries(paths: Vec<String>) -> Result<ApprovedLibraryScan
         }
     }
 
+    apply_local_steam_playtimes(&mut games);
+
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     Ok(ApprovedLibraryScanResult {
@@ -496,11 +673,85 @@ mod tests {
             state_flags: 0,
             last_updated: 0,
             last_played: 0,
+            steam_playtime_minutes: None,
+            steam_playtime_2weeks_minutes: None,
         };
 
         assert!(!is_user_visible_game(&game));
     }
 
+    #[test]
+    fn parses_localconfig_playtime_block() {
+        let contents = r#"
+"Software"
+{
+    "Valve"
+    {
+        "Steam"
+        {
+            "apps"
+            {
+                "4514930"
+                {
+                    "Playtime2wks"      "486"
+                    "Playtime"          "486"
+                }
+            }
+        }
+    }
+}
+"#;
+
+        let playtimes = parse_localconfig_playtimes(contents);
+        let game = playtimes.get("4514930").expect("playtime should exist");
+
+        assert_eq!(game.lifetime_minutes, Some(486));
+        assert_eq!(game.two_weeks_minutes, Some(486));
+    }
+
+    #[test]
+    fn ignores_unrelated_playtime_blocks() {
+        let contents = r#"
+"apps"
+{
+    "111"
+    {
+        "Playtime"      "12"
+    }
+
+    "4514930"
+    {
+        "Playtime"      "486"
+    }
+
+    "222"
+    {
+        "Playtime"      "999"
+    }
+}
+"#;
+
+        let playtimes = parse_localconfig_playtimes(contents);
+
+        assert_eq!(
+            playtimes
+                .get("4514930")
+                .and_then(|value| value.lifetime_minutes),
+            Some(486)
+        );
+        assert_eq!(
+            playtimes
+                .get("111")
+                .and_then(|value| value.lifetime_minutes),
+            Some(12)
+        );
+        assert_eq!(
+            playtimes
+                .get("222")
+                .and_then(|value| value.lifetime_minutes),
+            Some(999)
+        );
+    }
     #[test]
     fn preserves_normal_windows_path() {
         let result = parse_quoted_pair(r#""path"          "C:\Program Files (x86)\Steam""#);

@@ -15,6 +15,8 @@ type SteamGame = {
   stateFlags: number;
   lastUpdated: number;
   lastPlayed: number;
+  steamPlaytimeMinutes: number | null;
+  steamPlaytime2weeksMinutes: number | null;
 };
 
 type SteamScanResult = {

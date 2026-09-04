@@ -12,6 +12,8 @@ export type LibrarySteamGame = {
   stateFlags: number;
   lastUpdated: number;
   lastPlayed: number;
+  steamPlaytimeMinutes: number | null;
+  steamPlaytime2weeksMinutes: number | null;
 };
 
 type RunningGame = {
@@ -64,6 +66,25 @@ function formatSteamDate(timestamp: number) {
     month: "short",
     year: "numeric",
   }).format(date);
+}
+
+function formatSteamPlaytime(minutes: number | null) {
+  if (minutes === null || !Number.isFinite(minutes) || minutes < 0) {
+    return "Unknown";
+  }
+
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 function gameInitials(name: string) {
@@ -318,8 +339,10 @@ export default function LibraryPage({
                   </div>
 
                   <div>
-                    <span>Build</span>
-                    <strong>{game.buildId || "Unknown"}</strong>
+                    <span>Steam playtime</span>
+                    <strong>
+                      {formatSteamPlaytime(game.steamPlaytimeMinutes)}
+                    </strong>
                   </div>
                 </div>
 
