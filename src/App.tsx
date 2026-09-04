@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import GameLibrariesPage from "./components/GameLibrariesPage";
 import LibraryPage from "./components/LibraryPage";
 import "./App.css";
@@ -48,14 +48,91 @@ type AnalyticsSummary = {
   topGames: GameAnalytics[];
   recentSessions: RecentSession[];
 };
+const browserDevGames: SteamGame[] = [
+  {
+    appId: "1267910",
+    name: "Melvor Idle",
+    installDir: "Melvor Idle",
+    installPath: "",
+    libraryPath: "",
+    sizeOnDisk: 1450000000,
+    buildId: "dev",
+    stateFlags: 4,
+    lastUpdated: 0,
+    lastPlayed: Math.floor(Date.now() / 1000) - 86400,
+    steamPlaytimeMinutes: 1255,
+    steamPlaytime2weeksMinutes: 180,
+  },
+  {
+    appId: "4514930",
+    name: "The Undercut",
+    installDir: "The Undercut",
+    installPath: "",
+    libraryPath: "",
+    sizeOnDisk: 4200000000,
+    buildId: "dev",
+    stateFlags: 4,
+    lastUpdated: 0,
+    lastPlayed: Math.floor(Date.now() / 1000) - 3600,
+    steamPlaytimeMinutes: 486,
+    steamPlaytime2weeksMinutes: 486,
+  },
+  {
+    appId: "1142710",
+    name: "Total War: WARHAMMER III",
+    installDir: "Total War WARHAMMER III",
+    installPath: "",
+    libraryPath: "",
+    sizeOnDisk: 86000000000,
+    buildId: "dev",
+    stateFlags: 4,
+    lastUpdated: 0,
+    lastPlayed: Math.floor(Date.now() / 1000) - 172800,
+    steamPlaytimeMinutes: 49,
+    steamPlaytime2weeksMinutes: 0,
+  },
+];
+
+const browserDevSteamScan: SteamScanResult = {
+  steamPath: "",
+  libraryPaths: [],
+  games: browserDevGames,
+};
+
+const browserDevAnalytics: AnalyticsSummary = {
+  totalSeconds: 54600,
+  sessionCount: 8,
+  uniqueGames: 3,
+  topGames: [
+    {
+      appId: "4514930",
+      gameName: "The Undercut",
+      totalSeconds: 25200,
+      sessionCount: 3,
+    },
+    {
+      appId: "1267910",
+      gameName: "Melvor Idle",
+      totalSeconds: 19800,
+      sessionCount: 3,
+    },
+    {
+      appId: "1142710",
+      gameName: "Total War: WARHAMMER III",
+      totalSeconds: 9600,
+      sessionCount: 2,
+    },
+  ],
+  recentSessions: [],
+};
 
 const navItems: NavItem[] = [
-  { label: "Home", icon: "âŒ‚" },
-  { label: "Library", icon: "â–¦" },
-  { label: "Game Health", icon: "âœ“" },
-  { label: "Mods", icon: "â—†" },
-  { label: "Updates", icon: "â†»" },
-  { label: "Deals", icon: "Â£" },
+  { label: "Home", icon: "\u2302" },
+  { label: "Library", icon: "\u25C6" },
+  { label: "Game Health", icon: "\u2713" },
+  { label: "Mods", icon: "\u25C6" },
+  { label: "Updates", icon: "\u21BB" },
+  { label: "Deals", icon: "\u00A3" },
 ];
 
 type NavItem = {
@@ -121,6 +198,15 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
+    if (!isTauri()) {
+      setSteamScan(browserDevSteamScan);
+      setSteamError(null);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     invoke<SteamScanResult>("scan_steam_games")
       .then((result) => {
         if (!cancelled) {
@@ -142,6 +228,15 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!isTauri()) {
+      setAnalytics(browserDevAnalytics);
+      setAnalyticsError(null);
+
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const loadAnalytics = () => {
       invoke<AnalyticsSummary>("get_analytics_summary")
@@ -229,7 +324,7 @@ function App() {
           type="button"
           onClick={() => setActiveNav("Settings")}
         >
-          <span>âš™</span>
+          <span>{"\u2699"}</span>
           <span>Settings</span>
         </button>
 
@@ -248,7 +343,7 @@ function App() {
 
           <div className="topbar-actions">
             <label className="search-box">
-              <span>âŒ•</span>
+              <span>{"\u2315"}</span>
               <input
                 type="search"
                 placeholder="Search your games..."
@@ -257,7 +352,7 @@ function App() {
             </label>
 
             <button className="icon-button" type="button" aria-label="Notifications">
-              â™¢
+              {"\u25C7"}
             </button>
 
             <button className="profile-button" type="button" aria-label="Profile">
@@ -296,7 +391,7 @@ function App() {
               <PandaMark />
             </div>
             <div>
-              <strong>{steamScan ? steamScan.games.length : "â€”"}</strong>
+              <strong>{steamScan ? steamScan.games.length : "\u2014"}</strong>
               <span>{steamError ? "scan unavailable" : "games detected"}</span>
             </div>
           </div>
@@ -304,35 +399,35 @@ function App() {
 
         <section className="health-grid" aria-label="Gaming summary">
           <article className="health-card">
-            <span className="health-icon ready">â–¦</span>
+            <span className="health-icon ready">{"\u25C6"}</span>
             <div>
-              <strong>{steamScan?.games.length ?? "â€”"}</strong>
+              <strong>{steamScan?.games.length ?? "\u2014"}</strong>
               <span>Installed games</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon update">â—·</span>
+            <span className="health-icon update">{"\u25B7"}</span>
             <div>
               <strong>
-                {analytics ? formatDuration(analytics.totalSeconds) : "â€”"}
+                {analytics ? formatDuration(analytics.totalSeconds) : "\u2014"}
               </strong>
               <span>Tracked playtime</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon risk">â–¶</span>
+            <span className="health-icon risk">{"\u25B6"}</span>
             <div>
-              <strong>{analytics?.sessionCount ?? "â€”"}</strong>
+              <strong>{analytics?.sessionCount ?? "\u2014"}</strong>
               <span>Play sessions</span>
             </div>
           </article>
 
           <article className="health-card health-card-forge">
-            <span className="health-icon forge">â—†</span>
+            <span className="health-icon forge">{"\u25C6"}</span>
             <div>
-              <strong>{analytics?.uniqueGames ?? "â€”"}</strong>
+              <strong>{analytics?.uniqueGames ?? "\u2014"}</strong>
               <span>Games tracked</span>
             </div>
           </article>
@@ -350,7 +445,7 @@ function App() {
             onClick={() => setActiveNav("Library")}
           >
             View library
-            <span>â†’</span>
+            <span>{"\u2192"}</span>
           </button>
         </section>
 

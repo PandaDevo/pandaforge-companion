@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 
 export type LibrarySteamGame = {
   appId: string;
@@ -126,7 +126,7 @@ export default function LibraryPage({
     let cancelled = false;
 
     async function refreshArtwork() {
-      if (!steamPath || games.length === 0) {
+      if (!isTauri() || !steamPath || games.length === 0) {
         if (!cancelled) {
           setArtworkByAppId({});
         }
@@ -173,7 +173,7 @@ export default function LibraryPage({
     let cancelled = false;
 
     async function refreshRunningGames() {
-      if (games.length === 0) {
+      if (!isTauri() || games.length === 0) {
         if (!cancelled) {
           setRunningGames([]);
           setRunningError(null);
