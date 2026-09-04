@@ -50,12 +50,12 @@ type AnalyticsSummary = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Home", icon: "⌂" },
-  { label: "Library", icon: "▦" },
-  { label: "Game Health", icon: "✓" },
-  { label: "Mods", icon: "◆" },
-  { label: "Updates", icon: "↻" },
-  { label: "Deals", icon: "£" },
+  { label: "Home", icon: "âŒ‚" },
+  { label: "Library", icon: "â–¦" },
+  { label: "Game Health", icon: "âœ“" },
+  { label: "Mods", icon: "â—†" },
+  { label: "Updates", icon: "â†»" },
+  { label: "Deals", icon: "Â£" },
 ];
 
 type NavItem = {
@@ -229,7 +229,7 @@ function App() {
           type="button"
           onClick={() => setActiveNav("Settings")}
         >
-          <span>⚙</span>
+          <span>âš™</span>
           <span>Settings</span>
         </button>
 
@@ -248,7 +248,7 @@ function App() {
 
           <div className="topbar-actions">
             <label className="search-box">
-              <span>⌕</span>
+              <span>âŒ•</span>
               <input
                 type="search"
                 placeholder="Search your games..."
@@ -257,7 +257,7 @@ function App() {
             </label>
 
             <button className="icon-button" type="button" aria-label="Notifications">
-              ♢
+              â™¢
             </button>
 
             <button className="profile-button" type="button" aria-label="Profile">
@@ -271,6 +271,7 @@ function App() {
         ) : activeNav === "Library" ? (
           <LibraryPage
             games={steamScan?.games ?? []}
+            steamPath={steamScan?.steamPath ?? null}
             loading={!steamScan && !steamError}
             error={steamError}
           />
@@ -295,7 +296,7 @@ function App() {
               <PandaMark />
             </div>
             <div>
-              <strong>{steamScan ? steamScan.games.length : "—"}</strong>
+              <strong>{steamScan ? steamScan.games.length : "â€”"}</strong>
               <span>{steamError ? "scan unavailable" : "games detected"}</span>
             </div>
           </div>
@@ -303,35 +304,35 @@ function App() {
 
         <section className="health-grid" aria-label="Gaming summary">
           <article className="health-card">
-            <span className="health-icon ready">▦</span>
+            <span className="health-icon ready">â–¦</span>
             <div>
-              <strong>{steamScan?.games.length ?? "—"}</strong>
+              <strong>{steamScan?.games.length ?? "â€”"}</strong>
               <span>Installed games</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon update">◷</span>
+            <span className="health-icon update">â—·</span>
             <div>
               <strong>
-                {analytics ? formatDuration(analytics.totalSeconds) : "—"}
+                {analytics ? formatDuration(analytics.totalSeconds) : "â€”"}
               </strong>
               <span>Tracked playtime</span>
             </div>
           </article>
 
           <article className="health-card">
-            <span className="health-icon risk">▶</span>
+            <span className="health-icon risk">â–¶</span>
             <div>
-              <strong>{analytics?.sessionCount ?? "—"}</strong>
+              <strong>{analytics?.sessionCount ?? "â€”"}</strong>
               <span>Play sessions</span>
             </div>
           </article>
 
           <article className="health-card health-card-forge">
-            <span className="health-icon forge">◆</span>
+            <span className="health-icon forge">â—†</span>
             <div>
-              <strong>{analytics?.uniqueGames ?? "—"}</strong>
+              <strong>{analytics?.uniqueGames ?? "â€”"}</strong>
               <span>Games tracked</span>
             </div>
           </article>
@@ -349,7 +350,7 @@ function App() {
             onClick={() => setActiveNav("Library")}
           >
             View library
-            <span>→</span>
+            <span>â†’</span>
           </button>
         </section>
 

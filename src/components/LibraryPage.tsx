@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 export type LibrarySteamGame = {
   appId: string;
@@ -16,6 +16,11 @@ export type LibrarySteamGame = {
   steamPlaytime2weeksMinutes: number | null;
 };
 
+type GameArtwork = {
+  appId: string;
+  artworkPath: string | null;
+};
+
 type RunningGame = {
   appId: string;
   name: string;
@@ -25,6 +30,7 @@ type RunningGame = {
 
 type LibraryPageProps = {
   games: LibrarySteamGame[];
+  steamPath: string | null;
   loading: boolean;
   error: string | null;
 };
@@ -106,6 +112,7 @@ function gameInitials(name: string) {
 
 export default function LibraryPage({
   games,
+  steamPath,
   loading,
   error,
 }: LibraryPageProps) {
@@ -113,6 +120,54 @@ export default function LibraryPage({
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [runningGames, setRunningGames] = useState<RunningGame[]>([]);
   const [runningError, setRunningError] = useState<string | null>(null);
+  const [artworkByAppId, setArtworkByAppId] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshArtwork() {
+      if (!steamPath || games.length === 0) {
+        if (!cancelled) {
+          setArtworkByAppId({});
+        }
+
+        return;
+      }
+
+      try {
+        const result = await invoke<GameArtwork[]>("import_steam_artwork", {
+          steamPath,
+          appIds: games.map((game) => game.appId),
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextArtwork: Record<string, string> = {};
+
+        for (const item of result) {
+          if (item.artworkPath) {
+            nextArtwork[item.appId] = convertFileSrc(item.artworkPath);
+          }
+        }
+
+        setArtworkByAppId(nextArtwork);
+      } catch (artworkError) {
+        console.error("Unable to import local Steam artwork:", artworkError);
+
+        if (!cancelled) {
+          setArtworkByAppId({});
+        }
+      }
+    }
+
+    refreshArtwork();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [games, steamPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,65 +251,82 @@ export default function LibraryPage({
   );
 
   return (
-    <section className="library-page">
-      <div className="library-page-heading">
-        <div>
-          <p className="eyebrow">YOUR INSTALLED GAMES</p>
-          <h2>Library</h2>
-          <p>
-            Real games detected from your local Steam installation. Nothing
-            here is placeholder data.
+    <section className="pv-library">
+      <header className="pv-library-hero">
+        <div className="pv-library-heading">
+          <p className="pv-library-eyebrow">YOUR GAME COLLECTION</p>
+          <h1>Library</h1>
+          <p className="pv-library-intro">
+            Your installed games, ready to play.
           </p>
         </div>
 
-        <div className="library-count-card">
-          <strong>{games.length}</strong>
-          <span>Installed games</span>
+        <div className="pv-library-overview">
+          <div className="pv-library-overview-item">
+            <span>GAMES</span>
+            <strong>{games.length}</strong>
+          </div>
+
+          <div className="pv-library-overview-divider" />
+
+          <div className="pv-library-overview-item">
+            <span>INSTALLED</span>
+            <strong>{formatBytes(totalSize)}</strong>
+          </div>
+
+          <div className="pv-library-overview-divider" />
+
+          <div className="pv-library-overview-item">
+            <span>RUNNING</span>
+            <strong className={runningGames.length > 0 ? "is-live" : ""}>
+              {runningGames.length}
+            </strong>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="library-summary-grid">
-        <article>
-          <span>Games detected</span>
-          <strong>{games.length}</strong>
-        </article>
+      <div className="pv-library-toolbar">
+        <div className="pv-library-tabs" aria-label="Library filters">
+          <button type="button" className="pv-library-tab active">
+            ALL GAMES
+            <span>{games.length}</span>
+          </button>
 
-        <article>
-          <span>Total installed size</span>
-          <strong>{formatBytes(totalSize)}</strong>
-        </article>
+          <button type="button" className="pv-library-tab">
+            INSTALLED
+          </button>
 
-        <article>
-          <span>Running now</span>
-          <strong>{runningGames.length}</strong>
-        </article>
-      </div>
+          <button type="button" className="pv-library-tab">
+            FAVOURITES
+          </button>
+        </div>
 
-      <div className="library-controls">
-        <label className="library-search">
-          <span>⌕</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder="Search name, App ID or install path..."
-            aria-label="Search library"
-          />
-        </label>
+        <div className="pv-library-actions">
+          <label className="pv-library-search">
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder="Search your games..."
+              aria-label="Search library"
+            />
+          </label>
 
-        <label className="library-sort">
-          <span>Sort</span>
-          <select
-            value={sortMode}
-            onChange={(event) =>
-              setSortMode(event.currentTarget.value as SortMode)
-            }
-          >
-            <option value="name">Name</option>
-            <option value="recent">Recently played</option>
-            <option value="size">Installed size</option>
-          </select>
-        </label>
+          <label className="pv-library-sort">
+            <span>SORT</span>
+            <select
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(event.currentTarget.value as SortMode)
+              }
+            >
+              <option value="name">Name</option>
+              <option value="recent">Recently played</option>
+              <option value="size">Installed size</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {loading && (
@@ -288,73 +360,136 @@ export default function LibraryPage({
           <span>
             {games.length === 0
               ? "Add or scan game libraries from Settings."
-              : "Try a different game name, App ID or path."}
+              : "Try a different game name or App ID."}
           </span>
         </div>
       )}
 
       {!loading && !error && visibleGames.length > 0 && (
-        <div className="real-game-list">
-          {visibleGames.map((game) => (
-            <article className="real-game-card" key={game.appId}>
-              <div className="real-game-mark">
-                {gameInitials(game.name)}
-              </div>
+        <div className="pv-game-grid">
+          {visibleGames.map((game) => {
+            const isRunning = runningAppIds.has(game.appId);
 
-              <div className="real-game-main">
-                <div className="real-game-title-row">
-                  <div>
-                    <span className="real-game-platform">STEAM</span>
-                    <h3>{game.name}</h3>
+            return (
+              <article
+                className={`pv-game-card${isRunning ? " is-running" : ""}`}
+                key={game.appId}
+              >
+                <div className="pv-game-cover">
+                  {artworkByAppId[game.appId] ? (
+                    <img
+                      src={artworkByAppId[game.appId]}
+                      alt={`${game.name} cover`}
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+
+                        const fallback =
+                          event.currentTarget.nextElementSibling;
+
+                        if (fallback instanceof HTMLElement) {
+                          fallback.style.display = "grid";
+                        }
+                      }}
+                    />
+                  ) : null}
+
+                  <div
+                    className="pv-game-cover-fallback"
+                    style={{
+                      display: artworkByAppId[game.appId]
+                        ? "none"
+                        : "grid",
+                    }}
+                  >
+                    <strong>{gameInitials(game.name)}</strong>
                   </div>
 
-                  <div className="real-game-status-area">
-                    {runningAppIds.has(game.appId) && (
-                      <span className="real-game-running">
-                        <span className="status-dot status-ready" />
+                  <div className="pv-game-cover-shade" />
+
+                  <div className="pv-game-cover-top">
+                    <span className="pv-steam-badge">STEAM</span>
+
+                    {isRunning && (
+                      <span className="pv-running-badge">
+                        <span />
                         RUNNING
                       </span>
                     )}
+                  </div>
 
-                    <span className="real-game-appid">
-                      APP {game.appId}
+                  <div className="pv-game-cover-actions">
+                    <button
+                      type="button"
+                      className="pv-icon-button"
+                      title="Favourite"
+                      aria-label={`Favourite ${game.name}`}
+                    >
+                      ☆
+                    </button>
+
+                    <button
+                      type="button"
+                      className="pv-icon-button"
+                      title="More options"
+                      aria-label={`More options for ${game.name}`}
+                    >
+                      •••
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pv-game-content">
+                  <div className="pv-game-title">
+                    <div>
+                      <span className="pv-game-appid">
+                        APP {game.appId}
+                      </span>
+                      <h2>{game.name}</h2>
+                    </div>
+                  </div>
+
+                  <div className="pv-game-stats">
+                    <div>
+                      <span>PLAYTIME</span>
+                      <strong>
+                        {formatSteamPlaytime(game.steamPlaytimeMinutes)}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>SIZE</span>
+                      <strong>{formatBytes(game.sizeOnDisk)}</strong>
+                    </div>
+
+                    <div>
+                      <span>LAST PLAYED</span>
+                      <strong>{formatSteamDate(game.lastPlayed)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="pv-game-footer">
+                    <button
+                      type="button"
+                      className={`pv-play-button${
+                        isRunning ? " is-running" : ""
+                      }`}
+                      disabled={isRunning}
+                    >
+                      <span className="pv-play-symbol">
+                        {isRunning ? "●" : "▶"}
+                      </span>
+                      {isRunning ? "RUNNING" : "PLAY"}
+                    </button>
+
+                    <span className="pv-installed-status">
+                      <span />
+                      INSTALLED
                     </span>
                   </div>
                 </div>
-
-                <div className="real-game-meta-grid">
-                  <div>
-                    <span>Installed size</span>
-                    <strong>{formatBytes(game.sizeOnDisk)}</strong>
-                  </div>
-
-                  <div>
-                    <span>Last played</span>
-                    <strong>{formatSteamDate(game.lastPlayed)}</strong>
-                  </div>
-
-                  <div>
-                    <span>Last updated</span>
-                    <strong>{formatSteamDate(game.lastUpdated)}</strong>
-                  </div>
-
-                  <div>
-                    <span>Steam playtime</span>
-                    <strong>
-                      {formatSteamPlaytime(game.steamPlaytimeMinutes)}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="real-game-path">
-                  <span>INSTALL PATH</span>
-                  <code title={game.installPath}>
-                    {game.installPath}
-                  </code>
-                </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
