@@ -35,6 +35,15 @@ Get-AppxPackage | ForEach-Object {
 
     try {
         $manifest = Get-AppxPackageManifest -Package $package.PackageFullName
+        # PandaVault Xbox Classification V1:
+        # Only expose packages carrying MicrosoftGame.config.
+        # This is a high-confidence signal for modern Microsoft Store /
+        # Xbox PC packaged games. Uncertain Store applications remain excluded.
+        $microsoftGameConfig = Join-Path $package.InstallLocation 'MicrosoftGame.config'
+
+        if (-not (Test-Path -LiteralPath $microsoftGameConfig -PathType Leaf)) {
+            continue
+        }
 
         foreach ($application in @($manifest.Package.Applications.Application)) {
             if ($null -eq $application) {
