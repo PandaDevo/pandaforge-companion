@@ -1,5 +1,6 @@
 mod analytics;
 mod artwork;
+mod epic;
 mod steam;
 mod tracker;
 mod launcher;
@@ -62,6 +63,7 @@ pub fn run() {
             greet,
             steam::scan_steam_games,
             steam::scan_approved_libraries,
+            epic::scan_epic_games,
             artwork::import_steam_artwork,
             detect_running_games,
             get_analytics_summary,
