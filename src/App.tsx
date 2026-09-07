@@ -46,6 +46,24 @@ type SteamScanResult = {
   games: SteamGame[];
 };
 
+
+type XboxCandidate = {
+  name: string;
+  packageName: string;
+  packageFamilyName: string;
+  packageFullName: string;
+  applicationId: string;
+  aumid: string;
+  version: string;
+  publisher: string;
+  installLocation: string;
+};
+
+type XboxScanResult = {
+  available: boolean;
+  games: XboxCandidate[];
+  warnings: string[];
+};
 type GameAnalytics = {
   appId: string;
   gameName: string;
@@ -230,6 +248,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [steamScan, setSteamScan] = useState<SteamScanResult | null>(null);
   const [steamError, setSteamError] = useState<string | null>(null);
+  const [, setXboxScan] = useState<XboxScanResult | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
@@ -256,6 +275,42 @@ function App() {
         if (!cancelled) {
           setSteamScan(null);
           setSteamError(String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isTauri()) {
+      setXboxScan({
+        available: false,
+        games: [],
+        warnings: [],
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    invoke<XboxScanResult>("scan_xbox_games")
+      .then((result) => {
+        if (!cancelled) {
+          // Xbox V1 returns Windows application candidates.
+          // Keep them isolated until actual Xbox / Game Pass
+          // classification is trustworthy.
+          setXboxScan(result);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("Xbox discovery unavailable:", error);
+          setXboxScan(null);
         }
       });
 
