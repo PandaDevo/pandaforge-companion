@@ -16,6 +16,13 @@ pub struct EpicGame {
     pub version: Option<String>,
     pub catalog_namespace: Option<String>,
     pub catalog_item_id: Option<String>,
+    pub main_game_app_name: Option<String>,
+    pub main_game_catalog_namespace: Option<String>,
+    pub main_game_catalog_item_id: Option<String>,
+    pub app_categories: Vec<String>,
+    pub technical_type: Option<String>,
+    pub launch_executable: Option<String>,
+    pub is_executable: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -51,6 +58,24 @@ struct EpicManifest {
 
     #[serde(default)]
     catalog_item_id: String,
+
+    #[serde(default)]
+    main_game_app_name: String,
+
+    #[serde(default)]
+    main_game_catalog_namespace: String,
+
+    #[serde(default)]
+    main_game_catalog_item_id: String,
+
+    #[serde(default)]
+    app_categories: Vec<String>,
+
+    #[serde(default)]
+    technical_type: String,
+
+    #[serde(default)]
+    launch_executable: String,
 
     #[serde(default, rename = "bIsExecutable")]
     is_executable: Option<bool>,
@@ -164,6 +189,17 @@ fn parse_manifest(path: &Path) -> Result<Option<EpicGame>, String> {
         version: optional_string(manifest.app_version_string),
         catalog_namespace: optional_string(manifest.catalog_namespace),
         catalog_item_id: optional_string(manifest.catalog_item_id),
+        main_game_app_name: optional_string(manifest.main_game_app_name),
+        main_game_catalog_namespace: optional_string(
+            manifest.main_game_catalog_namespace,
+        ),
+        main_game_catalog_item_id: optional_string(
+            manifest.main_game_catalog_item_id,
+        ),
+        app_categories: manifest.app_categories,
+        technical_type: optional_string(manifest.technical_type),
+        launch_executable: optional_string(manifest.launch_executable),
+        is_executable: manifest.is_executable,
     }))
 }
 
@@ -292,6 +328,12 @@ mod tests {
                 "AppVersionString": "1.2.3",
                 "CatalogNamespace": "fixture-namespace",
                 "CatalogItemId": "fixture-item",
+                "MainGameAppName": "FixtureBaseGame",
+                "MainGameCatalogNamespace": "base-namespace",
+                "MainGameCatalogItemId": "base-item",
+                "AppCategories": ["games", "applications"],
+                "TechnicalType": "Game",
+                "LaunchExecutable": "PandaFixture.exe",
                 "bIsExecutable": true
             }"#,
         );
@@ -303,6 +345,18 @@ mod tests {
         assert_eq!(manifest.app_version_string, "1.2.3");
         assert_eq!(manifest.catalog_namespace, "fixture-namespace");
         assert_eq!(manifest.catalog_item_id, "fixture-item");
+        assert_eq!(manifest.main_game_app_name, "FixtureBaseGame");
+        assert_eq!(
+            manifest.main_game_catalog_namespace,
+            "base-namespace"
+        );
+        assert_eq!(manifest.main_game_catalog_item_id, "base-item");
+        assert_eq!(
+            manifest.app_categories,
+            vec!["games".to_string(), "applications".to_string()]
+        );
+        assert_eq!(manifest.technical_type, "Game");
+        assert_eq!(manifest.launch_executable, "PandaFixture.exe");
         assert_eq!(manifest.is_executable, Some(true));
     }
 
@@ -320,6 +374,12 @@ mod tests {
         assert_eq!(manifest.app_version_string, "");
         assert_eq!(manifest.catalog_namespace, "");
         assert_eq!(manifest.catalog_item_id, "");
+        assert_eq!(manifest.main_game_app_name, "");
+        assert_eq!(manifest.main_game_catalog_namespace, "");
+        assert_eq!(manifest.main_game_catalog_item_id, "");
+        assert!(manifest.app_categories.is_empty());
+        assert_eq!(manifest.technical_type, "");
+        assert_eq!(manifest.launch_executable, "");
         assert_eq!(manifest.is_executable, None);
     }
 
