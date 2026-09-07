@@ -66,6 +66,53 @@ fn launch_steam(game_id: &str) -> Result<(), String> {
     Err("Launching Steam games is not supported on this platform.".to_string())
 }
 
+fn validate_xbox_aumid(value: &str) -> Result<&str, String> {
+    let aumid = validate_identifier(value)?;
+
+    let Some((package_family, application_id)) = aumid.split_once('!') else {
+        return Err("Xbox game identifier is not a valid AUMID.".to_string());
+    };
+
+    if package_family.is_empty() || application_id.is_empty() {
+        return Err("Xbox game identifier is not a valid AUMID.".to_string());
+    }
+
+    let is_safe = aumid.chars().all(|character| {
+        character.is_ascii_alphanumeric()
+            || matches!(character, '.' | '-' | '_' | '!')
+    });
+
+    if !is_safe {
+        return Err("Xbox game identifier contains unsupported characters.".to_string());
+    }
+
+    Ok(aumid)
+}
+
+fn launch_xbox(game_id: &str) -> Result<(), String> {
+    let aumid = validate_xbox_aumid(game_id)?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let target = format!("shell:AppsFolder\\{aumid}");
+
+        Command::new("explorer.exe")
+            .arg(&target)
+            .spawn()
+            .map_err(|error| {
+                format!("Unable to ask Windows to launch the Xbox game: {error}")
+            })?;
+
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = aumid;
+
+        Err("Xbox / Microsoft Store launching is only supported on Windows.".to_string())
+    }
+}
 #[tauri::command]
 pub fn launch_game(source: String, game_id: String) -> Result<LaunchResult, String> {
     let normalized_source = source.trim().to_ascii_lowercase();
@@ -76,9 +123,7 @@ pub fn launch_game(source: String, game_id: String) -> Result<LaunchResult, Stri
         "epic" => {
             return Err("Epic Games launching is not connected yet.".to_string());
         }
-        "xbox" | "microsoft" => {
-            return Err("Xbox / Microsoft Store launching is not connected yet.".to_string());
-        }
+        "xbox" | "microsoft" => launch_xbox(&game_id)?,
         "gog" => {
             return Err("GOG launching is not connected yet.".to_string());
         }
@@ -120,6 +165,22 @@ mod tests {
         assert!(validate_identifier("   ").is_err());
     }
 
+    #[test]
+    fn accepts_valid_xbox_aumids() {
+        let aumid = "PandaFixture_123456789!Game";
+
+        assert_eq!(validate_xbox_aumid(aumid).unwrap(), aumid);
+    }
+
+    #[test]
+    fn rejects_xbox_identifier_without_application_separator() {
+        assert!(validate_xbox_aumid("PandaFixture_123456789").is_err());
+    }
+
+    #[test]
+    fn rejects_unsafe_xbox_aumids() {
+        assert!(validate_xbox_aumid("PandaFixture_123!Game & calc").is_err());
+    }
     #[test]
     fn steam_ids_must_be_numeric() {
         let invalid = "1142710 & something";

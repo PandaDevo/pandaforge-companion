@@ -4,6 +4,7 @@ mod epic;
 mod steam;
 mod tracker;
 mod launcher;
+mod xbox;
 
 use tauri::Manager;
 
@@ -64,6 +65,7 @@ pub fn run() {
             steam::scan_steam_games,
             steam::scan_approved_libraries,
             epic::scan_epic_games,
+            xbox::scan_xbox_games,
             artwork::import_steam_artwork,
             detect_running_games,
             get_analytics_summary,
