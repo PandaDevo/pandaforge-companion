@@ -2,6 +2,7 @@ mod analytics;
 mod artwork;
 mod steam;
 mod tracker;
+mod launcher;
 
 use tauri::Manager;
 
@@ -63,7 +64,8 @@ pub fn run() {
             steam::scan_approved_libraries,
             artwork::import_steam_artwork,
             detect_running_games,
-            get_analytics_summary
+            get_analytics_summary,
+            launcher::launch_game
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

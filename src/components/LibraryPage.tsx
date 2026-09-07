@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
+import {
+  Clock3,
+  Gamepad2,
+  HardDrive,
+  MoreHorizontal,
+  Play,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
+import "./LibraryPage.css";
 
 export type LibrarySteamGame = {
   appId: string;
@@ -21,6 +31,26 @@ type GameArtwork = {
   artworkPath: string | null;
 };
 
+const browserLibraryArtwork: Record<string, string> = {
+  "4514930":
+    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4514930/268bb497efc35744f6bc6de482e0cbc1b8eb1760/header.jpg",
+  "1267910":
+    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1267910/header.jpg",
+  "1142710":
+    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1142710/header.jpg",
+};
+
+function browserArtworkForGame(appId: string) {
+  return (
+    browserLibraryArtwork[appId] ??
+    `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`
+  );
+}
+type LaunchResult = {
+  source: string;
+  gameId: string;
+  launched: boolean;
+};
 type RunningGame = {
   appId: string;
   name: string;
@@ -117,6 +147,8 @@ export default function LibraryPage({
   error,
 }: LibraryPageProps) {
   const [query, setQuery] = useState("");
+  const [launchingAppId, setLaunchingAppId] = useState<string | null>(null);
+  const [launchError, setLaunchError] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("name");
   const [runningGames, setRunningGames] = useState<RunningGame[]>([]);
   const [runningError, setRunningError] = useState<string | null>(null);
@@ -126,7 +158,29 @@ export default function LibraryPage({
     let cancelled = false;
 
     async function refreshArtwork() {
-      if (!isTauri() || !steamPath || games.length === 0) {
+      if (games.length === 0) {
+        if (!cancelled) {
+          setArtworkByAppId({});
+        }
+
+        return;
+      }
+
+      if (!isTauri()) {
+        const nextArtwork: Record<string, string> = {};
+
+        for (const game of games) {
+          nextArtwork[game.appId] = browserArtworkForGame(game.appId);
+        }
+
+        if (!cancelled) {
+          setArtworkByAppId(nextArtwork);
+        }
+
+        return;
+      }
+
+      if (!steamPath) {
         if (!cancelled) {
           setArtworkByAppId({});
         }
@@ -191,10 +245,10 @@ export default function LibraryPage({
           setRunningGames(result);
           setRunningError(null);
         }
-      } catch (error) {
+      } catch (runtimeError) {
         if (!cancelled) {
           setRunningGames([]);
-          setRunningError(String(error));
+          setRunningError(String(runtimeError));
         }
       }
     }
@@ -209,6 +263,43 @@ export default function LibraryPage({
     };
   }, [games]);
 
+  async function launchGame(game: LibrarySteamGame) {
+    if (runningAppIds.has(game.appId) || launchingAppId !== null) {
+      return;
+    }
+
+    setLaunchError(null);
+
+    if (!isTauri()) {
+      setLaunchError(
+        "Game launching is available in the PandaVault desktop app."
+      );
+      return;
+    }
+
+    setLaunchingAppId(game.appId);
+
+    try {
+      const result = await invoke<LaunchResult>("launch_game", {
+        source: "steam",
+        gameId: game.appId,
+      });
+
+      if (!result.launched) {
+        throw new Error(`PandaVault could not launch ${game.name}.`);
+      }
+    } catch (launchFailure) {
+      console.error(`Unable to launch ${game.name}:`, launchFailure);
+
+      setLaunchError(
+        launchFailure instanceof Error
+          ? launchFailure.message
+          : String(launchFailure)
+      );
+    } finally {
+      setLaunchingAppId(null);
+    }
+  }
   const visibleGames = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
 
@@ -245,19 +336,36 @@ export default function LibraryPage({
     [games],
   );
 
+  const totalPlaytime = useMemo(
+    () =>
+      games.reduce(
+        (total, game) =>
+          total + (game.steamPlaytimeMinutes ?? 0),
+        0,
+      ),
+    [games],
+  );
+
   const runningAppIds = useMemo(
     () => new Set(runningGames.map((game) => game.appId)),
     [runningGames],
   );
 
   return (
-    <section className="pv-library">
+    <section className="pv-library pv-library-v4">
       <header className="pv-library-hero">
         <div className="pv-library-heading">
-          <p className="pv-library-eyebrow">YOUR GAME COLLECTION</p>
+          <div className="pv-library-kicker">
+            <span className="pv-library-kicker-icon">
+              <Gamepad2 size={14} aria-hidden="true" />
+            </span>
+            YOUR GAME COLLECTION
+          </div>
+
           <h1>Library</h1>
+
           <p className="pv-library-intro">
-            Your installed games, ready to play.
+            Everything installed on your gaming PC, organised in one place.
           </p>
         </div>
 
@@ -270,8 +378,15 @@ export default function LibraryPage({
           <div className="pv-library-overview-divider" />
 
           <div className="pv-library-overview-item">
-            <span>INSTALLED</span>
+            <span>STORAGE</span>
             <strong>{formatBytes(totalSize)}</strong>
+          </div>
+
+          <div className="pv-library-overview-divider" />
+
+          <div className="pv-library-overview-item">
+            <span>PLAYTIME</span>
+            <strong>{formatSteamPlaytime(totalPlaytime)}</strong>
           </div>
 
           <div className="pv-library-overview-divider" />
@@ -286,40 +401,51 @@ export default function LibraryPage({
       </header>
 
       <div className="pv-library-toolbar">
-        <div className="pv-library-tabs" aria-label="Library filters">
-          <button type="button" className="pv-library-tab active">
-            ALL GAMES
-            <span>{games.length}</span>
-          </button>
+        <div className="pv-library-view">
+          <div className="pv-library-view-title">
+            <span>INSTALLED GAMES</span>
+            <strong>{visibleGames.length}</strong>
+          </div>
 
-          <button type="button" className="pv-library-tab">
-            INSTALLED
-          </button>
-
-          <button type="button" className="pv-library-tab">
-            FAVOURITES
-          </button>
+          <span className="pv-library-view-note">
+            Steam library
+          </span>
         </div>
 
         <div className="pv-library-actions">
           <label className="pv-library-search">
-            <span aria-hidden="true">⌕</span>
+            <Search size={16} aria-hidden="true" />
+
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Search your games..."
+              placeholder="Search your library"
               aria-label="Search library"
             />
+
+            {query && (
+              <button
+                type="button"
+                className="pv-library-search-clear"
+                onClick={() => setQuery("")}
+                aria-label="Clear library search"
+              >
+                CLEAR
+              </button>
+            )}
           </label>
 
           <label className="pv-library-sort">
+            <SlidersHorizontal size={14} aria-hidden="true" />
             <span>SORT</span>
+
             <select
               value={sortMode}
               onChange={(event) =>
                 setSortMode(event.currentTarget.value as SortMode)
               }
+              aria-label="Sort library"
             >
               <option value="name">Name</option>
               <option value="recent">Recently played</option>
@@ -343,6 +469,18 @@ export default function LibraryPage({
         </div>
       )}
 
+      {launchError && (
+        <div className="library-launch-warning" role="alert">
+          <strong>Unable to launch game</strong>
+          <span>{launchError}</span>
+          <button
+            type="button"
+            onClick={() => setLaunchError(null)}
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
       {runningError && !error && (
         <div className="library-runtime-warning">
           <strong>Live game detection unavailable</strong>
@@ -357,10 +495,11 @@ export default function LibraryPage({
               ? "No installed Steam games detected"
               : "No games match your search"}
           </strong>
+
           <span>
             {games.length === 0
               ? "Add or scan game libraries from Settings."
-              : "Try a different game name or App ID."}
+              : "Try another game name or App ID."}
           </span>
         </div>
       )}
@@ -421,47 +560,34 @@ export default function LibraryPage({
                     <button
                       type="button"
                       className="pv-icon-button"
-                      title="Favourite"
-                      aria-label={`Favourite ${game.name}`}
+                      title="Game options coming later"
+                      aria-label={`Options for ${game.name}`}
+                      disabled
                     >
-                      ☆
+                      <MoreHorizontal size={17} aria-hidden="true" />
                     </button>
+                  </div>
 
-                    <button
-                      type="button"
-                      className="pv-icon-button"
-                      title="More options"
-                      aria-label={`More options for ${game.name}`}
-                    >
-                      •••
-                    </button>
+                  <div className="pv-game-cover-playtime">
+                    <Clock3 size={12} aria-hidden="true" />
+                    {formatSteamPlaytime(game.steamPlaytimeMinutes)}
                   </div>
                 </div>
 
                 <div className="pv-game-content">
                   <div className="pv-game-title">
-                    <div>
-                      <span className="pv-game-appid">
-                        APP {game.appId}
-                      </span>
-                      <h2>{game.name}</h2>
-                    </div>
+<h2 title={game.name}>{game.name}</h2>
                   </div>
 
                   <div className="pv-game-stats">
                     <div>
-                      <span>PLAYTIME</span>
-                      <strong>
-                        {formatSteamPlaytime(game.steamPlaytimeMinutes)}
-                      </strong>
-                    </div>
-
-                    <div>
+                      <HardDrive size={13} aria-hidden="true" />
                       <span>SIZE</span>
                       <strong>{formatBytes(game.sizeOnDisk)}</strong>
                     </div>
 
                     <div>
+                      <Clock3 size={13} aria-hidden="true" />
                       <span>LAST PLAYED</span>
                       <strong>{formatSteamDate(game.lastPlayed)}</strong>
                     </div>
@@ -473,17 +599,32 @@ export default function LibraryPage({
                       className={`pv-play-button${
                         isRunning ? " is-running" : ""
                       }`}
-                      disabled={isRunning}
+                      onClick={() => launchGame(game)}
+                      disabled={isRunning || launchingAppId !== null}
+                      title={
+                        isRunning
+                          ? `${game.name} is currently running`
+                          : launchingAppId === game.appId
+                            ? `Launching ${game.name}`
+                            : `Launch ${game.name}`
+                      }
                     >
-                      <span className="pv-play-symbol">
-                        {isRunning ? "●" : "▶"}
-                      </span>
-                      {isRunning ? "RUNNING" : "PLAY"}
+                      <Play size={13} fill="currentColor" aria-hidden="true" />
+                      {isRunning
+                        ? "RUNNING"
+                        : launchingAppId === game.appId
+                          ? "LAUNCHING..."
+                          : "PLAY"}
                     </button>
 
-                    <span className="pv-installed-status">
-                      <span />
-                      INSTALLED
+                    <span
+                      className="pv-installed-status"
+                      aria-label="Installed through Steam"
+                    >
+                      <span className="pv-source-dot" />
+                      <strong>STEAM</strong>
+                      <span className="pv-source-separator">·</span>
+                      <span>INSTALLED</span>
                     </span>
                   </div>
                 </div>
